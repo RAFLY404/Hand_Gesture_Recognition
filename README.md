@@ -22,3 +22,16 @@ streamlit run app.py
 ```
 
 After the app opens, click **Start**, allow browser camera access, and place your hand inside the green box.
+
+## Deploy To Streamlit Community Cloud
+
+1. Push this project to a GitHub repository.
+2. Make sure `app.py`, `gesture_predictor.py`, `requirements.txt`, `gesture_model.pkl`, `gesture_scaler.pkl`, and `gesture_encoder.pkl` are included.
+3. Go to Streamlit Community Cloud and create a new app from the GitHub repository.
+4. In **Advanced settings**, choose Python `3.12`.
+5. Set the main file path to `app.py`.
+6. Deploy the app.
+
+The `gesture_dataset` folder is not required for deployment because the model has already been trained and saved.
+
+Live webcam access requires HTTPS in production. Streamlit Community Cloud provides HTTPS automatically.
