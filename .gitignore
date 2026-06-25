@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.env
+.agents/
+.codex/
+.streamlit/secrets.toml
+streamlit.log
+streamlit.err
+
+# The Streamlit app only needs the saved .pkl artifacts, not the full dataset.
+gesture_dataset/
