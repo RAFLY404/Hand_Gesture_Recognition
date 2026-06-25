@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import threading
-import time
+import os
 
 import av
 import cv2
@@ -19,13 +19,47 @@ st.set_page_config(
 )
 
 
-RTC_CONFIGURATION = RTCConfiguration(
-    {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
-)
-
-
 def prettify_label(label: str) -> str:
     return label.replace("_", " ").title()
+
+
+def read_secret(name: str) -> str:
+    try:
+        value = st.secrets.get(name, "")
+    except Exception:
+        value = ""
+    return str(value).strip()
+
+
+def read_config_value(name: str) -> str:
+    return os.getenv(name, "").strip() or read_secret(name)
+
+
+def get_rtc_configuration() -> tuple[RTCConfiguration, bool]:
+    ice_servers = [
+        {
+            "urls": [
+                "stun:stun.l.google.com:19302",
+                "stun:global.stun.twilio.com:3478",
+            ]
+        }
+    ]
+
+    turn_urls = read_config_value("TURN_SERVER_URL")
+    turn_username = read_config_value("TURN_USERNAME")
+    turn_credential = read_config_value("TURN_CREDENTIAL")
+
+    if turn_urls and turn_username and turn_credential:
+        ice_servers.append(
+            {
+                "urls": [url.strip() for url in turn_urls.split(",") if url.strip()],
+                "username": turn_username,
+                "credential": turn_credential,
+            }
+        )
+        return RTCConfiguration({"iceServers": ice_servers}), True
+
+    return RTCConfiguration({"iceServers": ice_servers}), False
 
 
 def draw_label_box(frame_bgr: np.ndarray, text: str, color: tuple[int, int, int]) -> None:
@@ -131,6 +165,8 @@ class GestureVideoProcessor(VideoProcessorBase):
 st.title("Live Hand Gesture Recognition")
 st.caption("Allow camera access, place your hand inside the green box, and keep the background simple.")
 
+rtc_configuration, turn_enabled = get_rtc_configuration()
+
 with st.sidebar:
     st.header("Model")
     st.write("Gestures: fist, open hand, peace, pointing, thumbs up.")
@@ -147,51 +183,22 @@ with left:
     ctx = webrtc_streamer(
         key="live-gesture-recognition",
         video_processor_factory=GestureVideoProcessor,
-        rtc_configuration=RTC_CONFIGURATION,
+        rtc_configuration=rtc_configuration,
         media_stream_constraints={"video": True, "audio": False},
         async_processing=True,
     )
 
 with right:
     st.subheader("Live Status")
-    status_box = st.empty()
-    score_box = st.empty()
+    if ctx.state.playing:
+        st.success("Camera stream is running.")
+    else:
+        st.info("Click Start to begin live detection.")
 
-if ctx.video_processor:
-    while ctx.state.playing:
-        with ctx.video_processor.lock:
-            label = ctx.video_processor.label
-            confidence = ctx.video_processor.confidence
-            probabilities = dict(ctx.video_processor.probabilities)
-            foreground_ratio = ctx.video_processor.foreground_ratio
-            feature_count = ctx.video_processor.feature_count
-            error = ctx.video_processor.error
-
-        with status_box.container():
-            if label in {"Waiting", "No hand"}:
-                st.metric("Gesture", label)
-            else:
-                st.metric("Gesture", prettify_label(label))
-            st.metric("Confidence", f"{confidence:.1%}")
-            st.caption(f"Foreground ratio: {foreground_ratio:.2%}")
-            if feature_count:
-                st.caption(f"Feature vector: {feature_count} values")
-            if error:
-                st.caption(error)
-
-        with score_box.container():
-            if probabilities:
-                st.divider()
-                st.subheader("Class Scores")
-                for class_label, probability in sorted(
-                    probabilities.items(),
-                    key=lambda item: item[1],
-                    reverse=True,
-                ):
-                    st.write(prettify_label(class_label))
-                    st.progress(probability, text=f"{probability:.1%}")
-
-        time.sleep(0.4)
-else:
-    with status_box.container():
-        st.info("Start the camera stream to begin live detection.")
+    st.write("The current prediction and mask preview are drawn directly on the video.")
+    st.divider()
+    st.subheader("Connection")
+    if turn_enabled:
+        st.success("TURN server configured.")
+    else:
+        st.warning("Using public STUN only. Some deployed networks need a TURN server.")

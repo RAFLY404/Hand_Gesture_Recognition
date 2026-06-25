@@ -35,3 +35,17 @@ After the app opens, click **Start**, allow browser camera access, and place you
 The `gesture_dataset` folder is not required for deployment because the model has already been trained and saved.
 
 Live webcam access requires HTTPS in production. Streamlit Community Cloud provides HTTPS automatically.
+
+## WebRTC Connection Notes
+
+The app uses WebRTC for live webcam frames. Public STUN servers are configured by default, but some deployed networks need a TURN server for the video connection to work reliably.
+
+If the app shows repeated `NoneType` / `sendto` errors from `aioice` or `aiortc`, add TURN credentials in Streamlit Cloud **Secrets**:
+
+```toml
+TURN_SERVER_URL = "turn:your-turn-server.example.com:3478"
+TURN_USERNAME = "your-username"
+TURN_CREDENTIAL = "your-password"
+```
+
+For multiple TURN URLs, separate them with commas in `TURN_SERVER_URL`.
